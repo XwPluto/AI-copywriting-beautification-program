@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>电影剪辑文案美化工具</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="hero">
+      <p class="hero-tag">FOR EDITORS · LATE NIGHT WRITING</p>
+      <h1>电影剪辑团队专属文案美化工具</h1>
+      <p class="hero-desc">把口语化草稿，整理成更顺、更有节奏、更像爆款解说的视频文案。</p>
+    </header>
+
+    <main class="panel">
+      <section class="toolbar">
+        <div class="toolbar-left">
+          <span class="toolbar-label">当前状态</span>
+          <strong id="appStatus">准备就绪</strong>
+        </div>
+        <div class="toolbar-actions">
+          <button id="openAuthBtn" class="ghost-btn" type="button">登录/注册</button>
+          <button id="openLibraryBtn" class="ghost-btn" type="button">我的文案库</button>
+          <button id="openSettingsBtn" class="ghost-btn" type="button">设置</button>
+        </div>
+      </section>
+
+      <section class="mode-area">
+        <div>
+          <label for="modeSelect" class="field-label">工作模式</label>
+          <select id="modeSelect" class="select-field">
+            <option value="cloud">模式 A：云端 API 模式</option>
+            <option value="ollama">模式 B：本地 Ollama 模式</option>
+          </select>
+        </div>
+
+        <div class="mode-cards">
+          <article class="mode-card is-active" data-mode-card="cloud">
+            <p class="mode-card-tag">MODE A</p>
+            <h3>云端 API 模式</h3>
+            <p>适合直接上手。支持智谱、DeepSeek、火山引擎 ARK。</p>
+          </article>
+          <article class="mode-card" data-mode-card="ollama">
+            <p class="mode-card-tag">MODE B</p>
+            <h3>本地 Ollama 模式</h3>
+            <p>适合隐私和本地化需求。可自动读取本地模型列表。</p>
+          </article>
+        </div>
+
+        <div class="mode-panels">
+          <section class="mode-panel" id="cloudModePanel">
+            <div class="info-chip-row">
+              <span class="info-chip">支持：智谱 / DeepSeek / 火山 ARK</span>
+              <span class="info-chip">火山需填写模型/接入点ID</span>
+            </div>
+          </section>
+          <section class="mode-panel" id="ollamaModePanel" hidden>
+            <div class="info-chip-row">
+              <span class="info-chip">服务地址默认：localhost:11434</span>
+              <span class="info-chip">需先 pull 本地模型</span>
+            </div>
+            <button id="openOllamaHelpBtn" class="ghost-btn" type="button">❓ 使用帮助</button>
+          </section>
+        </div>
+      </section>
+
+      <section class="editor-block">
+        <div class="section-heading-row">
+          <label for="inputText" class="field-label">原始草稿</label>
+          <span class="field-hint">建议粘贴完整口语笔记，保留原始语气</span>
+        </div>
+        <textarea id="inputText" class="text-panel" placeholder="把你的口语化剪辑笔记粘贴到这里……"></textarea>
+      </section>
+
+      <section class="action-area">
+        <button id="beautifyBtn" class="primary-btn" type="button">一键美化</button>
+      </section>
+
+      <section class="editor-block">
+        <div class="output-title-row">
+          <div class="section-heading-row compact">
+            <label for="outputText" class="field-label">美化结果</label>
+          </div>
+          <div class="output-actions">
+            <button id="saveCloudBtn" class="ghost-btn" type="button">保存到云空间</button>
+            <button id="copyBtn" class="ghost-btn" type="button">复制结果</button>
+          </div>
+        </div>
+        <textarea id="outputText" class="text-panel output-panel" placeholder="美化后的文案会显示在这里……" readonly></textarea>
+        <p id="errorMessage" class="error-message" hidden></p>
+      </section>
+    </main>
+  </div>
+
+  <!-- 设置弹窗（原有） -->
+  <div id="settingsModal" class="modal" hidden>
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <p class="modal-tag">SETUP PANEL</p>
+          <h2>设置</h2>
+        </div>
+        <button id="closeSettingsBtn" class="ghost-btn" type="button">关闭</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="settings-grid">
+          <section class="settings-section">
+            <h3>云端 API 设置</h3>
+            <label class="field-label" for="providerSelect">API 提供商</label>
+            <select id="providerSelect" class="select-field">
+              <option value="zhipu">智谱 AI（GLM-4-Flash）</option>
+              <option value="deepseek">DeepSeek</option>
+              <option value="volcengine">火山引擎（ARK）</option>
+            </select>
+
+            <label class="field-label" for="apiKeyInput">API Key</label>
+            <input id="apiKeyInput" class="text-input" type="password" placeholder="仅保存在你的浏览器本地" />
+
+            <label class="field-label" for="cloudModelInput">云端模型/接入点 ID（火山必填）</label>
+            <input id="cloudModelInput" class="text-input" type="text" placeholder="例：ep-2025xxxx（火山推理接入点ID）" />
+          </section>
+
+          <section class="settings-section">
+            <h3>本地 Ollama 设置</h3>
+            <label class="field-label" for="ollamaUrlInput">Ollama 服务地址</label>
+            <input id="ollamaUrlInput" class="text-input" type="text" placeholder="例如：http://localhost:11434" />
+
+            <label class="field-label" for="ollamaModelSelect">本地模型</label>
+            <select id="ollamaModelSelect" class="select-field">
+              <option value="">自动读取本地模型列表</option>
+            </select>
+          </section>
+        </div>
+
+        <div class="settings-actions">
+          <button id="saveSettingsBtn" class="primary-btn settings-save-btn" type="button">保存设置</button>
+          <button id="testCloudBtn" class="ghost-btn settings-test-btn" type="button">测试云端连接</button>
+          <button id="testOllamaBtn" class="ghost-btn settings-test-btn" type="button">测试 Ollama 连接</button>
+          <button id="exportSettingsBtn" class="ghost-btn settings-test-btn" type="button">导出设置</button>
+          <button id="importSettingsBtn" class="ghost-btn settings-test-btn" type="button">导入设置</button>
+          <label class="export-key-toggle"><input id="includeApiKeyCheckbox" type="checkbox" /><span>导出时包含 API Key（谨慎）</span></label>
+          <input id="importSettingsInput" type="file" accept="application/json" hidden />
+          <p id="settingsStatus" class="settings-status">未保存</p>
+          <p id="connectionStatus" class="connection-status">连接状态：未测试</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 新增：Ollama 使用帮助弹窗 -->
+  <div id="ollamaHelpModal" class="modal" hidden>
+    <div class="modal-card help-card">
+      <div class="modal-header">
+        <h2>如何启用本地模型（模式 B）？</h2>
+        <button id="closeOllamaHelpBtn" class="ghost-btn" type="button">关闭</button>
+      </div>
+      <div class="modal-body help-content">
+        <ol>
+          <li>
+            <strong>确保已安装 Ollama</strong>
+            <p>前往 <a href="https://ollama.com" target="_blank" rel="noreferrer">ollama.com</a> 下载并安装。</p>
+            <p>打开终端（CMD 或 PowerShell）运行：<code>ollama pull deepseek-r1:7b</code></p>
+          </li>
+          <li>
+            <strong>启动 Ollama 并允许网页访问</strong>
+            <p><strong>Windows：</strong></p>
+            <pre>set OLLAMA_ORIGINS=*
+ollama serve</pre>
+            <p><strong>macOS / Linux：</strong></p>
+            <pre>export OLLAMA_ORIGINS=*
+ollama serve</pre>
+          </li>
+          <li>
+            <strong>在设置中输入 Ollama 地址</strong>
+            <p>默认地址：<code>http://localhost:11434</code></p>
+          </li>
+          <li>
+            <strong>点击“测试 Ollama 连接”并选择模型</strong>
+          </li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
+  <!-- 新增：登录/注册弹窗 -->
+  <div id="authModal" class="modal" hidden>
+    <div class="modal-card auth-card">
+      <div class="modal-header">
+        <h2>登录 / 注册</h2>
+        <button id="closeAuthBtn" class="ghost-btn" type="button">关闭</button>
+      </div>
+      <div class="modal-body">
+        <div class="auth-tabs">
+          <button id="authLoginTab" class="ghost-btn is-active" type="button">登录</button>
+          <button id="authSignupTab" class="ghost-btn" type="button">注册</button>
+        </div>
+        <label class="field-label" for="authEmailInput">邮箱</label>
+        <input id="authEmailInput" class="text-input" type="email" placeholder="you@example.com" />
+        <label class="field-label" for="authPasswordInput">密码</label>
+        <input id="authPasswordInput" class="text-input" type="password" placeholder="请输入密码" />
+        <div class="auth-actions">
+          <button id="authSubmitBtn" class="primary-btn settings-save-btn" type="button">提交</button>
+          <p id="authStatus" class="settings-status">未登录</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 新增：文案库侧边抽屉 -->
+  <aside id="libraryDrawer" class="library-drawer" hidden>
+    <div class="library-header">
+      <h2>文案库</h2>
+      <button id="closeLibraryBtn" class="ghost-btn" type="button">关闭</button>
+    </div>
+    <div class="library-tabs">
+      <button id="myDraftsTab" class="ghost-btn is-active" type="button">我的文案</button>
+      <button id="teamDraftsTab" class="ghost-btn" type="button">团队共享</button>
+    </div>
+    <div id="libraryList" class="library-list"></div>
+  </aside>
+
+  <script src="./script.js"></script>
+</body>
+</html>
