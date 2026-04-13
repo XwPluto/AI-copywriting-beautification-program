@@ -625,41 +625,41 @@ async function handleLibraryActionClick(event) {
   }
 }
 // 事件
-el.openSettingsBtn.addEventListener('click', async () => {
+el.openSettingsBtn?.addEventListener('click', async () => {
   openSettings();
   await fetchOllamaModels();
 });
-el.closeSettingsBtn.addEventListener('click', closeSettings);
-el.settingsModal.addEventListener('click', (e) => {
+el.closeSettingsBtn?.addEventListener('click', closeSettings);
+el.settingsModal?.addEventListener('click', (e) => {
   if (e.target === el.settingsModal) closeSettings();
 });
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && !el.settingsModal.hidden) closeSettings();
+  if (e.key === 'Escape' && el.settingsModal && !el.settingsModal.hidden) closeSettings();
   if (e.key === 'Escape' && el.ollamaHelpModal && !el.ollamaHelpModal.hidden) closeModal(el.ollamaHelpModal);
   if (e.key === 'Escape' && el.authModal && !el.authModal.hidden) closeModal(el.authModal);
   if (e.key === 'Escape' && el.libraryDrawer && !el.libraryDrawer.hidden) el.libraryDrawer.hidden = true;
 });
 
-el.modeSelect.addEventListener('change', () => renderMode(el.modeSelect.value));
-el.ollamaUrlInput.addEventListener('blur', fetchOllamaModels);
+el.modeSelect?.addEventListener('change', () => renderMode(el.modeSelect.value));
+el.ollamaUrlInput?.addEventListener('blur', fetchOllamaModels);
 
-el.saveSettingsBtn.addEventListener('click', () => {
+el.saveSettingsBtn?.addEventListener('click', () => {
   saveSettings(collectSettings());
-  el.settingsStatus.textContent = '已保存到本地浏览器';
-  el.appStatus.textContent = '设置已保存（LocalStorage）';
+  if (el.settingsStatus) el.settingsStatus.textContent = '已保存到本地浏览器';
+  if (el.appStatus) el.appStatus.textContent = '设置已保存（LocalStorage）';
 });
 
-el.testCloudBtn.addEventListener('click', testCloud);
-el.testOllamaBtn.addEventListener('click', testOllama);
-el.exportSettingsBtn.addEventListener('click', exportSettings);
-el.importSettingsBtn.addEventListener('click', () => el.importSettingsInput.click());
-el.importSettingsInput.addEventListener('change', async () => {
-  await importSettings(el.importSettingsInput.files?.[0]);
-  el.importSettingsInput.value = '';
+el.testCloudBtn?.addEventListener('click', testCloud);
+el.testOllamaBtn?.addEventListener('click', testOllama);
+el.exportSettingsBtn?.addEventListener('click', exportSettings);
+el.importSettingsBtn?.addEventListener('click', () => el.importSettingsInput?.click());
+el.importSettingsInput?.addEventListener('change', async () => {
+  await importSettings(el.importSettingsInput?.files?.[0]);
+  if (el.importSettingsInput) el.importSettingsInput.value = '';
 });
 
-el.beautifyBtn.addEventListener('click', async () => {
-  const draft = el.inputText.value.trim();
+el.beautifyBtn?.addEventListener('click', async () => {
+  const draft = el.inputText?.value.trim() || '';
   if (!draft) return showError('你还没粘贴草稿内容，先把文案贴到上面的输入框吧。');
 
   const s = collectSettings();
@@ -670,21 +670,21 @@ el.beautifyBtn.addEventListener('click', async () => {
   try {
     const result = s.mode === 'cloud' ? await cloudChat(draft, s) : await ollamaChat(draft, s);
     showMessage(result);
-    el.appStatus.textContent = '美化完成';
+    if (el.appStatus) el.appStatus.textContent = '美化完成';
   } catch (e) {
     showError(`网络好像开小差了，检查一下设置是否正确：${e.message}`);
-    el.appStatus.textContent = '美化失败';
+    if (el.appStatus) el.appStatus.textContent = '美化失败';
   } finally {
     setLoading(false);
   }
 });
 
-el.copyBtn.addEventListener('click', async () => {
-  if (!el.outputText.value.trim()) return showError('现在还没有可复制的内容，先生成一版文案再试试。');
+el.copyBtn?.addEventListener('click', async () => {
+  if (!el.outputText?.value.trim()) return showError('现在还没有可复制的内容，先生成一版文案再试试。');
   try {
     await navigator.clipboard.writeText(el.outputText.value);
-    el.appStatus.textContent = '结果已复制';
-    el.errorMessage.hidden = true;
+    if (el.appStatus) el.appStatus.textContent = '结果已复制';
+    if (el.errorMessage) el.errorMessage.hidden = true;
   } catch {
     showError('复制失败了，可能是浏览器暂时不允许，请手动复制一下。');
   }
@@ -709,22 +709,22 @@ el.authSubmitBtn?.addEventListener('click', handleAuthSubmit);
 
 // V2 事件：文案库
 el.openLibraryBtn?.addEventListener('click', async () => {
-  el.libraryDrawer.hidden = false;
+  if (el.libraryDrawer) el.libraryDrawer.hidden = false;
   await refreshLibraryData();
 });
 el.closeLibraryBtn?.addEventListener('click', () => {
-  el.libraryDrawer.hidden = true;
+  if (el.libraryDrawer) el.libraryDrawer.hidden = true;
 });
 el.myDraftsTab?.addEventListener('click', async () => {
   appState.libraryTab = 'mine';
-  el.myDraftsTab.classList.add('is-active');
-  el.teamDraftsTab.classList.remove('is-active');
+  el.myDraftsTab?.classList.add('is-active');
+  el.teamDraftsTab?.classList.remove('is-active');
   await refreshLibraryData();
 });
 el.teamDraftsTab?.addEventListener('click', async () => {
   appState.libraryTab = 'team';
-  el.teamDraftsTab.classList.add('is-active');
-  el.myDraftsTab.classList.remove('is-active');
+  el.teamDraftsTab?.classList.add('is-active');
+  el.myDraftsTab?.classList.remove('is-active');
   await refreshLibraryData();
 });
 el.libraryList?.addEventListener('click', handleLibraryActionClick);
@@ -733,8 +733,20 @@ el.saveCloudBtn?.addEventListener('click', saveCurrentDraftToCloud);
 (async () => {
   const s = loadSettings();
   applySettings(s);
-  el.settingsStatus.textContent = '已读取本地设置';
+
+  if (el.settingsStatus) el.settingsStatus.textContent = '已读取本地设置';
   setConnection('未测试');
-  await fetchOllamaModels();
-  await refreshLibraryData();
+
+  try {
+    await fetchOllamaModels();
+  } catch {}
+
+  try {
+    appState.user = await loadCurrentUser();
+    updateAuthStatus();
+  } catch {}
+
+  try {
+    await refreshLibraryData();
+  } catch {}
 })();
