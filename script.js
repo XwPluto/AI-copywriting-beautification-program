@@ -86,8 +86,29 @@ const el = {
 const appState = {
   authMode: 'login',
   user: null,
-  libraryTab: 'mine'
+  libraryTab: 'mine',
+  currentLibraryItems: []
 };
+
+// =========================
+// Supabase 客户端与开关
+// =========================
+let supabaseClient = null;
+
+function isSupabaseEnabled() {
+  return SUPABASE_URL && SUPABASE_ANON_KEY
+    && !SUPABASE_URL.includes('YOUR_SUPABASE_URL')
+    && !SUPABASE_ANON_KEY.includes('YOUR_SUPABASE_ANON_KEY')
+    && Boolean(window.supabase);
+}
+
+function getSupabaseClient() {
+  if (!isSupabaseEnabled()) return null;
+  if (!supabaseClient) {
+    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  }
+  return supabaseClient;
+}
 
 function normalizeSettings(s = {}) {
   return {
@@ -359,6 +380,19 @@ function loadLocalAuth() {
   } catch {
     return null;
   }
+}
+
+async function loadCurrentUser() {
+  const sb = getSupabaseClient();
+  if (!sb) {
+    try {
+      return JSON.parse(localStorage.getItem(CLOUD_AUTH_LOCAL_KEY) || 'null');
+    } catch {
+      return null;
+    }
+  }
+  const { data } = await sb.auth.getUser();
+  return data?.user || null;
 }
 
 function saveLocalAuth(user) {
