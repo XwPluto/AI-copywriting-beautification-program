@@ -1,4 +1,4 @@
-const STORAGE_KEY = 'movieCopyBeautifierSettings';
+﻿const STORAGE_KEY = 'movieCopyBeautifierSettings';
 const CLOUD_DRAFTS_LOCAL_KEY = 'movieCopyBeautifierCloudDrafts';
 const CLOUD_AUTH_LOCAL_KEY = 'movieCopyBeautifierAuth';
 
@@ -309,7 +309,6 @@ async function testOllama() {
     const n = Array.isArray(data.models) ? data.models.length : 0;
     setConnection(n ? `Ollama 连接正常，已发现 ${n} 个模型` : 'Ollama 已连接，但未发现模型，请先 pull 模型', n ? 'success' : 'error');
     await fetchOllamaModels();
-  renderLibraryList();
   } catch {
     setConnection('Ollama 测试失败：请确保已安装并运行 Ollama', 'error');
   } finally {
@@ -354,7 +353,6 @@ async function importSettings(file) {
     el.settingsStatus.textContent = '设置导入成功并已保存';
     setConnection('未测试');
     await fetchOllamaModels();
-  renderLibraryList();
   } catch {
     el.settingsStatus.textContent = '导入失败：文件格式不正确';
     setConnection('导入失败，请选择有效的 JSON 文件', 'error');
@@ -432,10 +430,7 @@ function shortText(text = '') {
 
 function renderLibraryList() {
   if (!el.libraryList) return;
-  const all = loadLocalDrafts();
-  const items = appState.libraryTab === 'team'
-    ? all.filter((x) => x.isPublic)
-    : all.filter((x) => !appState.user || x.owner === appState.user.email);
+  const items = appState.currentLibraryItems || [];
 
   if (!items.length) {
     el.libraryList.innerHTML = '<p class="library-empty">暂无记录。先美化一条文案并点击“保存到云空间”吧。</p>';
@@ -443,21 +438,58 @@ function renderLibraryList() {
   }
 
   el.libraryList.innerHTML = items
-    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-    .map((item) => `
-      <article class="library-item" data-id="${item.id}">
-        <div class="library-item-meta">${new Date(item.createdAt).toLocaleString()}</div>
-        <div>原文：${shortText(item.input)}</div>
-        <div>美化：${shortText(item.output)}</div>
+    .sort((a, b) => new Date(b.createdAt || b.created_at) - new Date(a.createdAt || a.created_at))
+    .map((item) => {
+      const id = item.id;
+      const input = item.input ?? item.input_text ?? '';
+      const output = item.output ?? item.output_text ?? '';
+      const createdAt = item.createdAt ?? item.created_at;
+      return `
+      <article class="library-item" data-id="${id}">
+        <div class="library-item-meta">${new Date(createdAt).toLocaleString()}</div>
+        <div>原文：${shortText(input)}</div>
+        <div>美化：${shortText(output)}</div>
         <div class="library-item-actions">
-          <button class="ghost-btn" type="button" data-action="view" data-id="${item.id}">查看</button>
-          <button class="ghost-btn" type="button" data-action="copy" data-id="${item.id}">复制</button>
-          <button class="ghost-btn" type="button" data-action="delete" data-id="${item.id}">删除</button>
+          <button class="ghost-btn" type="button" data-action="view" data-id="${id}">查看</button>
+          <button class="ghost-btn" type="button" data-action="copy" data-id="${id}">复制</button>
+          <button class="ghost-btn" type="button" data-action="delete" data-id="${id}">删除</button>
         </div>
       </article>
-    `).join('');
+    `;
+    }).join('');
 }
 
+async function refreshLibraryData() {
+  const client = getSupabaseClient();
+
+  if (!client) {
+    const all = loadLocalDrafts();
+    appState.currentLibraryItems = appState.libraryTab === 'team'
+      ? all.filter((x) => x.isPublic)
+      : all.filter((x) => !appState.user || x.owner === appState.user.email);
+    renderLibraryList();
+    return;
+  }
+
+  if (!appState.user) {
+    appState.currentLibraryItems = [];
+    renderLibraryList();
+    return;
+  }
+
+  const query = appState.libraryTab === 'team'
+    ? client.from('copy_drafts').select('*').eq('is_shared', true).order('created_at', { ascending: false })
+    : client.from('copy_drafts').select('*').eq('user_id', appState.user.id).order('created_at', { ascending: false });
+
+  const { data, error } = await query;
+  if (error) {
+    showError(`读取文案失败：${error.message}`);
+    return;
+  }
+
+  appState.currentLibraryItems = data || [];
+  renderLibraryList();
+}
 async function saveCurrentDraftToCloud() {
   const input = el.inputText.value.trim();
   const output = el.outputText.value.trim();
@@ -471,20 +503,39 @@ async function saveCurrentDraftToCloud() {
     return;
   }
 
-  const list = loadLocalDrafts();
-  list.push({
-    id: `draft_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`,
-    owner: appState.user.email,
-    input,
-    output,
-    isPublic: false,
-    createdAt: new Date().toISOString()
-  });
-  saveLocalDrafts(list);
-  el.appStatus.textContent = '已保存到云空间（本地模拟）';
-  renderLibraryList();
-}
+  const client = getSupabaseClient();
+  if (!client) {
+    const list = loadLocalDrafts();
+    list.push({
+      id: `draft_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`,
+      owner: appState.user.email,
+      input,
+      output,
+      isPublic: true,
+      createdAt: new Date().toISOString()
+    });
+    saveLocalDrafts(list);
+    el.appStatus.textContent = '已保存到云空间（本地模拟）';
+    await refreshLibraryData();
+    return;
+  }
 
+  const { error } = await client.from('copy_drafts').insert({
+    user_id: appState.user.id,
+    user_email: appState.user.email,
+    input_text: input,
+    output_text: output,
+    is_shared: true
+  });
+
+  if (error) {
+    showError(`云空间保存失败：${error.message}`);
+    return;
+  }
+
+  el.appStatus.textContent = '已保存到云空间';
+  await refreshLibraryData();
+}
 async function handleAuthSubmit() {
   const email = el.authEmailInput?.value.trim();
   const password = el.authPasswordInput?.value.trim();
@@ -493,36 +544,59 @@ async function handleAuthSubmit() {
     return;
   }
 
-  const user = { email, loggedAt: new Date().toISOString() };
-  appState.user = user;
-  saveLocalAuth(user);
-  updateAuthStatus();
-  if (el.authStatus) el.authStatus.textContent = appState.authMode === 'login' ? '登录成功（本地模拟）' : '注册成功（本地模拟）';
-  closeModal(el.authModal);
-  renderLibraryList();
-}
+  const client = getSupabaseClient();
+  if (!client) {
+    const user = { email, loggedAt: new Date().toISOString() };
+    appState.user = user;
+    saveLocalAuth(user);
+    updateAuthStatus();
+    if (el.authStatus) el.authStatus.textContent = appState.authMode === 'login' ? '登录成功（本地模拟）' : '注册成功（本地模拟）';
+    closeModal(el.authModal);
+    await refreshLibraryData();
+    return;
+  }
 
-function handleLibraryActionClick(event) {
+  if (appState.authMode === 'signup') {
+    const { error } = await client.auth.signUp({ email, password });
+    if (el.authStatus) el.authStatus.textContent = error ? `注册失败：${error.message}` : '注册成功，请先邮箱验证，再登录';
+    return;
+  }
+
+  const { error } = await client.auth.signInWithPassword({ email, password });
+  if (error) {
+    if (el.authStatus) el.authStatus.textContent = `登录失败：${error.message}`;
+    return;
+  }
+
+  appState.user = await loadCurrentUser();
+  updateAuthStatus();
+  if (el.authStatus) el.authStatus.textContent = '登录成功';
+  closeModal(el.authModal);
+  await refreshLibraryData();
+}
+async function handleLibraryActionClick(event) {
   const target = event.target;
   if (!(target instanceof HTMLElement)) return;
   const action = target.getAttribute('data-action');
   const id = target.getAttribute('data-id');
   if (!action || !id) return;
 
-  const list = loadLocalDrafts();
-  const item = list.find((x) => x.id === id);
+  const item = (appState.currentLibraryItems || []).find((x) => String(x.id) === String(id));
   if (!item) return;
 
+  const input = item.input ?? item.input_text ?? '';
+  const output = item.output ?? item.output_text ?? '';
+
   if (action === 'view') {
-    el.inputText.value = item.input;
-    el.outputText.value = item.output;
+    el.inputText.value = input;
+    el.outputText.value = output;
     el.libraryDrawer.hidden = true;
     el.appStatus.textContent = '已载入文案记录';
     return;
   }
 
   if (action === 'copy') {
-    navigator.clipboard.writeText(item.output || '').then(() => {
+    navigator.clipboard.writeText(output || '').then(() => {
       el.appStatus.textContent = '文案已复制';
     }).catch(() => {
       showError('复制失败，请手动复制。');
@@ -531,18 +605,29 @@ function handleLibraryActionClick(event) {
   }
 
   if (action === 'delete') {
-    const next = list.filter((x) => x.id !== id);
-    saveLocalDrafts(next);
-    renderLibraryList();
+    const client = getSupabaseClient();
+    if (!client) {
+      const next = loadLocalDrafts().filter((x) => String(x.id) !== String(id));
+      saveLocalDrafts(next);
+      await refreshLibraryData();
+      el.appStatus.textContent = '记录已删除';
+      return;
+    }
+
+    const { error } = await client.from('copy_drafts').delete().eq('id', id);
+    if (error) {
+      showError(`删除失败：${error.message}`);
+      return;
+    }
+
+    await refreshLibraryData();
     el.appStatus.textContent = '记录已删除';
   }
 }
-
 // 事件
 el.openSettingsBtn.addEventListener('click', async () => {
   openSettings();
   await fetchOllamaModels();
-  renderLibraryList();
 });
 el.closeSettingsBtn.addEventListener('click', closeSettings);
 el.settingsModal.addEventListener('click', (e) => {
@@ -623,24 +708,24 @@ el.authSignupTab?.addEventListener('click', () => setAuthMode('signup'));
 el.authSubmitBtn?.addEventListener('click', handleAuthSubmit);
 
 // V2 事件：文案库
-el.openLibraryBtn?.addEventListener('click', () => {
+el.openLibraryBtn?.addEventListener('click', async () => {
   el.libraryDrawer.hidden = false;
-  renderLibraryList();
+  await refreshLibraryData();
 });
 el.closeLibraryBtn?.addEventListener('click', () => {
   el.libraryDrawer.hidden = true;
 });
-el.myDraftsTab?.addEventListener('click', () => {
+el.myDraftsTab?.addEventListener('click', async () => {
   appState.libraryTab = 'mine';
   el.myDraftsTab.classList.add('is-active');
   el.teamDraftsTab.classList.remove('is-active');
-  renderLibraryList();
+  await refreshLibraryData();
 });
-el.teamDraftsTab?.addEventListener('click', () => {
+el.teamDraftsTab?.addEventListener('click', async () => {
   appState.libraryTab = 'team';
   el.teamDraftsTab.classList.add('is-active');
   el.myDraftsTab.classList.remove('is-active');
-  renderLibraryList();
+  await refreshLibraryData();
 });
 el.libraryList?.addEventListener('click', handleLibraryActionClick);
 el.saveCloudBtn?.addEventListener('click', saveCurrentDraftToCloud);
@@ -651,5 +736,5 @@ el.saveCloudBtn?.addEventListener('click', saveCurrentDraftToCloud);
   el.settingsStatus.textContent = '已读取本地设置';
   setConnection('未测试');
   await fetchOllamaModels();
-  renderLibraryList();
+  await refreshLibraryData();
 })();
