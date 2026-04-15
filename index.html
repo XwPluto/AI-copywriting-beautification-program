@@ -104,6 +104,17 @@
           <label for="videoUrlInput" class="field-label">视频链接</label>
           <span class="field-hint">支持 YouTube / B站 / X 等平台（由后端 yt-dlp 能力决定）</span>
         </div>
+
+        <div class="video-guide">
+          <p class="video-guide-title">本地使用说明（团队版）</p>
+          <ol>
+            <li>先双击项目根目录 <code>启动工具(团队).bat</code>（会自动检测并启动后端）。</li>
+            <li>再切换到“视频下载”标签，粘贴链接后点击“下载视频”。</li>
+            <li>如提示连接失败，先双击 <code>状态检查.bat</code> 排查后端状态。</li>
+            <li>使用完毕后双击 <code>停止(总控).bat</code> 释放本机资源。</li>
+          </ol>
+        </div>
+
         <div class="video-row">
           <input id="videoUrlInput" class="text-input" type="text" placeholder="粘贴视频链接，例如：https://www.youtube.com/watch?v=..." />
           <button id="videoDownloadBtn" class="primary-btn video-btn" type="button">下载视频</button>

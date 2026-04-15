@@ -519,6 +519,33 @@ body {
   background: rgba(8, 12, 19, 0.72);
 }
 
+.video-guide {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(114, 226, 195, 0.22);
+  background: rgba(114, 226, 195, 0.07);
+}
+
+.video-guide-title {
+  margin: 0 0 6px;
+  font-size: 14px;
+  color: #9bead2;
+  font-weight: 700;
+}
+
+.video-guide ol {
+  margin: 0;
+  padding-left: 18px;
+  color: #b7c6e8;
+  line-height: 1.7;
+  font-size: 13px;
+}
+
+.video-guide code {
+  color: #9bead2;
+}
+
 .video-row {
   display: grid;
   grid-template-columns: 1fr auto;
