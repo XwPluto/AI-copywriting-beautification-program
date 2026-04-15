@@ -1,0 +1,32 @@
+# video-downloader 子模块规则（仅本目录生效）
+
+## 作用范围
+- 本规则仅用于 `video-downloader` 目录及其子目录。
+- 与主项目（AI 文案美化）解耦，避免跨目录误改。
+
+## 开发边界
+1. 只修改视频下载相关文件：
+   - `main.py`
+   - `requirements.txt`
+   - `downloads/`（下载产物）
+   - 本目录内运维脚本（`*.bat`、`*.service.template`）
+2. 不修改主项目前端核心文件：
+   - `../index.html`
+   - `../script.js`
+   - `../style.css`
+   除非用户明确要求“联动改造”。
+3. 保持接口稳定：
+   - `POST /api/download`
+   - `GET /api/health`
+
+## 脚本约定
+- 优先保留并使用：
+  - `部署初始化(Windows云主机).bat`
+  - `启动(团队).bat`
+  - `停止(团队).bat`
+  - `启动(公网).bat`
+- 历史兼容脚本若无必要，直接删除，避免团队混淆。
+
+## 记录约定
+- 子模块变更只更新本目录 `PROJECT_CONTEXT.md`。
+- 主项目全局变更再更新上级目录 `../PROJECT_CONTEXT.md`。

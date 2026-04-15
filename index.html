@@ -27,6 +27,12 @@
         </div>
       </section>
 
+      <section class="feature-switch">
+        <button id="openCopywritingPanelBtn" class="ghost-btn is-active" type="button">文案美化</button>
+        <button id="openVideoPanelBtn" class="ghost-btn" type="button">视频下载</button>
+      </section>
+
+      <div id="copywritingPanel">
       <section class="mode-area">
         <div>
           <label for="modeSelect" class="field-label">工作模式</label>
@@ -91,6 +97,19 @@
         <textarea id="outputText" class="text-panel output-panel" placeholder="美化后的文案会显示在这里……" readonly></textarea>
         <p id="errorMessage" class="error-message" hidden></p>
       </section>
+      </div>
+
+      <section id="videoPanel" class="video-panel" hidden>
+        <div class="section-heading-row">
+          <label for="videoUrlInput" class="field-label">视频链接</label>
+          <span class="field-hint">支持 YouTube / B站 / X 等平台（由后端 yt-dlp 能力决定）</span>
+        </div>
+        <div class="video-row">
+          <input id="videoUrlInput" class="text-input" type="text" placeholder="粘贴视频链接，例如：https://www.youtube.com/watch?v=..." />
+          <button id="videoDownloadBtn" class="primary-btn video-btn" type="button">下载视频</button>
+        </div>
+        <p id="videoStatus" class="settings-status">等待输入链接</p>
+      </section>
     </main>
   </div>
 
@@ -121,6 +140,9 @@
 
             <label class="field-label" for="cloudModelInput">云端模型/接入点 ID（火山必填）</label>
             <input id="cloudModelInput" class="text-input" type="text" placeholder="例：ep-2025xxxx（火山推理接入点ID）" />
+
+            <label class="field-label" for="videoApiBaseInput">视频下载后端地址（线上部署时必填）</label>
+            <input id="videoApiBaseInput" class="text-input" type="text" placeholder="例如：https://video-api.your-domain.com" />
           </section>
 
           <section class="settings-section">

@@ -502,6 +502,46 @@ body {
   margin-top: 8px;
 }
 
+.feature-switch {
+  display: inline-flex;
+  gap: 8px;
+  margin-bottom: 14px;
+  padding: 6px;
+  border: 1px solid rgba(130, 180, 255, 0.16);
+  border-radius: 12px;
+  background: rgba(8, 12, 19, 0.6);
+}
+
+.video-panel {
+  border: 1px solid rgba(130, 180, 255, 0.16);
+  border-radius: 14px;
+  padding: 14px;
+  background: rgba(8, 12, 19, 0.72);
+}
+
+.video-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.video-btn {
+  min-width: 160px;
+  min-height: 50px;
+  font-size: 16px;
+}
+
+@media (max-width: 720px) {
+  .video-row {
+    grid-template-columns: 1fr;
+  }
+
+  .video-btn {
+    width: 100%;
+  }
+}
+
 @media (max-width: 860px) {
   .mode-cards,
   .settings-grid {

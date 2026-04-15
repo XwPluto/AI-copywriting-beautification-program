@@ -2,6 +2,7 @@
 const CLOUD_DRAFTS_LOCAL_KEY = 'movieCopyBeautifierCloudDrafts';
 const CLOUD_AUTH_LOCAL_KEY = 'movieCopyBeautifierAuth';
 
+
 // V2：Supabase 配置占位
 const SUPABASE_URL = 'YOUR_SUPABASE_URL'; // 请替换为你的项目URL
 const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY'; // 请替换为你的anon key
@@ -29,6 +30,7 @@ const DEFAULT_SETTINGS = {
   provider: 'zhipu',
   apiKey: '',
   cloudModel: '',
+  videoApiBase: '',
   ollamaUrl: 'http://localhost:11434',
   ollamaModel: ''
 };
@@ -36,6 +38,13 @@ const DEFAULT_SETTINGS = {
 const $ = (id) => document.getElementById(id);
 const el = {
   appStatus: $('appStatus'),
+  openVideoPanelBtn: $('openVideoPanelBtn'),
+  openCopywritingPanelBtn: $('openCopywritingPanelBtn'),
+  copywritingPanel: $('copywritingPanel'),
+  videoPanel: $('videoPanel'),
+  videoUrlInput: $('videoUrlInput'),
+  videoDownloadBtn: $('videoDownloadBtn'),
+  videoStatus: $('videoStatus'),
   openSettingsBtn: $('openSettingsBtn'),
   closeSettingsBtn: $('closeSettingsBtn'),
   settingsModal: $('settingsModal'),
@@ -46,6 +55,7 @@ const el = {
   providerSelect: $('providerSelect'),
   apiKeyInput: $('apiKeyInput'),
   cloudModelInput: $('cloudModelInput'),
+  videoApiBaseInput: $('videoApiBaseInput'),
   ollamaUrlInput: $('ollamaUrlInput'),
   ollamaModelSelect: $('ollamaModelSelect'),
   saveSettingsBtn: $('saveSettingsBtn'),
@@ -87,7 +97,8 @@ const appState = {
   authMode: 'login',
   user: null,
   libraryTab: 'mine',
-  currentLibraryItems: []
+  currentLibraryItems: [],
+  activeFeature: 'copywriting'
 };
 
 // =========================
@@ -116,6 +127,7 @@ function normalizeSettings(s = {}) {
     provider: ['zhipu', 'deepseek', 'volcengine'].includes(s.provider) ? s.provider : 'zhipu',
     apiKey: typeof s.apiKey === 'string' ? s.apiKey : '',
     cloudModel: typeof s.cloudModel === 'string' ? s.cloudModel : '',
+    videoApiBase: typeof s.videoApiBase === 'string' ? s.videoApiBase.trim() : '',
     ollamaUrl: typeof s.ollamaUrl === 'string' && s.ollamaUrl.trim() ? s.ollamaUrl.trim() : DEFAULT_SETTINGS.ollamaUrl,
     ollamaModel: typeof s.ollamaModel === 'string' ? s.ollamaModel : ''
   };
@@ -141,6 +153,7 @@ function collectSettings() {
     provider: el.providerSelect.value,
     apiKey: el.apiKeyInput.value.trim(),
     cloudModel: el.cloudModelInput.value.trim(),
+    videoApiBase: el.videoApiBaseInput?.value.trim() || '',
     ollamaUrl: el.ollamaUrlInput.value.trim(),
     ollamaModel: el.ollamaModelSelect.value
   });
@@ -151,9 +164,21 @@ function applySettings(s) {
   el.providerSelect.value = s.provider;
   el.apiKeyInput.value = s.apiKey;
   el.cloudModelInput.value = s.cloudModel;
+  if (el.videoApiBaseInput) el.videoApiBaseInput.value = s.videoApiBase || '';
   el.ollamaUrlInput.value = s.ollamaUrl;
   el.ollamaModelSelect.dataset.pendingModel = s.ollamaModel || '';
   renderMode(s.mode);
+}
+
+function getVideoApiBase() {
+  const configured = (el.videoApiBaseInput?.value || '').trim();
+  if (configured) return configured.replace(/\/$/, '');
+
+  const host = window.location.hostname;
+  const isLocalHost = host === 'localhost' || host === '127.0.0.1';
+  if (isLocalHost) return 'http://127.0.0.1:8000';
+
+  return '';
 }
 
 function showError(text) {
@@ -185,6 +210,87 @@ function renderMode(mode) {
   el.cloudModePanel.hidden = mode !== 'cloud';
   el.ollamaModePanel.hidden = mode !== 'ollama';
   el.appStatus.textContent = mode === 'cloud' ? '当前：云端 API 模式' : '当前：本地 Ollama 模式';
+}
+
+function renderFeature(feature) {
+  appState.activeFeature = feature === 'video' ? 'video' : 'copywriting';
+  const isVideo = appState.activeFeature === 'video';
+
+  if (el.copywritingPanel) el.copywritingPanel.hidden = isVideo;
+  if (el.videoPanel) el.videoPanel.hidden = !isVideo;
+
+  el.openCopywritingPanelBtn?.classList.toggle('is-active', !isVideo);
+  el.openVideoPanelBtn?.classList.toggle('is-active', isVideo);
+
+  if (isVideo) {
+    if (el.appStatus) el.appStatus.textContent = '当前：视频下载模式';
+    if (el.errorMessage) {
+      el.errorMessage.hidden = true;
+      el.errorMessage.textContent = '';
+    }
+  } else if (el.appStatus) {
+    el.appStatus.textContent = '当前：文案美化模式';
+  }
+}
+
+async function downloadVideoFromApi() {
+  const rawUrl = el.videoUrlInput?.value.trim() || '';
+  if (!rawUrl) {
+    if (el.videoStatus) el.videoStatus.textContent = '请先输入视频链接';
+    return;
+  }
+
+  if (el.videoDownloadBtn) {
+    el.videoDownloadBtn.disabled = true;
+    el.videoDownloadBtn.textContent = '下载中...';
+  }
+  if (el.videoStatus) el.videoStatus.textContent = '正在请求下载，请稍候...';
+
+  try {
+    const form = new FormData();
+    form.append('url', rawUrl);
+
+    const apiBase = getVideoApiBase();
+    if (!apiBase) {
+      throw new Error('当前为线上环境，请先在设置中填写“视频下载后端地址”');
+    }
+
+    const res = await fetch(`${apiBase}/api/download`, {
+      method: 'POST',
+      body: form
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `请求失败: ${res.status}`);
+    }
+
+    const blob = await res.blob();
+    const cd = res.headers.get('Content-Disposition') || '';
+    let filename = 'video.mp4';
+    const m = cd.match(/filename\*?=(?:UTF-8'')?"?([^";]+)"?/i);
+    if (m && m[1]) filename = decodeURIComponent(m[1]);
+
+    const a = document.createElement('a');
+    const href = URL.createObjectURL(blob);
+    a.href = href;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(href);
+
+    if (el.videoStatus) el.videoStatus.textContent = `下载完成：${filename}`;
+    if (el.appStatus) el.appStatus.textContent = '视频下载完成';
+  } catch (e) {
+    if (el.videoStatus) el.videoStatus.textContent = `下载失败：${e.message}`;
+    if (el.appStatus) el.appStatus.textContent = '视频下载失败';
+  } finally {
+    if (el.videoDownloadBtn) {
+      el.videoDownloadBtn.disabled = false;
+      el.videoDownloadBtn.textContent = '下载视频';
+    }
+  }
 }
 
 function openSettings() {
@@ -625,6 +731,10 @@ async function handleLibraryActionClick(event) {
   }
 }
 // 事件
+// 功能切换
+el.openCopywritingPanelBtn?.addEventListener('click', () => renderFeature('copywriting'));
+el.openVideoPanelBtn?.addEventListener('click', () => renderFeature('video'));
+
 el.openSettingsBtn?.addEventListener('click', async () => {
   openSettings();
   await fetchOllamaModels();
@@ -729,6 +839,7 @@ el.teamDraftsTab?.addEventListener('click', async () => {
 });
 el.libraryList?.addEventListener('click', handleLibraryActionClick);
 el.saveCloudBtn?.addEventListener('click', saveCurrentDraftToCloud);
+el.videoDownloadBtn?.addEventListener('click', downloadVideoFromApi);
 
 (async () => {
   const s = loadSettings();
@@ -749,4 +860,5 @@ el.saveCloudBtn?.addEventListener('click', saveCurrentDraftToCloud);
   try {
     await refreshLibraryData();
   } catch {}
+  renderFeature('copywriting');
 })();
