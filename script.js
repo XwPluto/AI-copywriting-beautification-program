@@ -598,7 +598,13 @@ async function refreshLibraryData() {
     return;
   }
 
-  if (!appState.user) {
+  // 已启用 Supabase 但没有有效 user.id（常见于从本地模拟切到云端后）
+  // 这里强制以 Supabase 会话为准，避免出现 user_id = undefined 导致 UUID 报错。
+  if (!appState.user?.id) {
+    appState.user = await loadCurrentUser();
+  }
+
+  if (!appState.user?.id) {
     appState.currentLibraryItems = [];
     renderLibraryList();
     return;
@@ -624,14 +630,15 @@ async function saveCurrentDraftToCloud() {
     showError('请先生成美化结果，再保存到云空间。');
     return;
   }
-  if (!appState.user) {
-    showError('请先登录，再保存到云空间。');
-    openModal(el.authModal);
-    return;
-  }
 
   const client = getSupabaseClient();
+
   if (!client) {
+    if (!appState.user) {
+      showError('请先登录，再保存到云空间。');
+      openModal(el.authModal);
+      return;
+    }
     const list = loadLocalDrafts();
     list.push({
       id: `draft_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`,
@@ -644,6 +651,18 @@ async function saveCurrentDraftToCloud() {
     saveLocalDrafts(list);
     el.appStatus.textContent = '已保存（本地模拟：仅当前浏览器可见）';
     await refreshLibraryData();
+    return;
+  }
+
+  // Supabase 已启用时，强制使用 Supabase 会话中的用户，避免 user_id 为 undefined。
+  if (!appState.user?.id) {
+    appState.user = await loadCurrentUser();
+    updateAuthStatus();
+  }
+
+  if (!appState.user?.id) {
+    showError('请先使用 Supabase 账号登录，再保存到云空间。');
+    openModal(el.authModal);
     return;
   }
 
