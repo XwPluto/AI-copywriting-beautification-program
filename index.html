@@ -152,6 +152,13 @@
             <label class="field-label" for="cloudModelInput">云端模型/接入点 ID（火山必填）</label>
             <input id="cloudModelInput" class="text-input" type="text" placeholder="例：ep-2025xxxx（火山推理接入点ID）" />
 
+            <!-- V2.1：Supabase 真实云端配置 -->
+            <label class="field-label" for="supabaseUrlInput">Supabase 项目 URL</label>
+            <input id="supabaseUrlInput" class="text-input" type="text" placeholder="https://xxxx.supabase.co" />
+
+            <label class="field-label" for="supabaseAnonKeyInput">Supabase Anon Key</label>
+            <input id="supabaseAnonKeyInput" class="text-input" type="password" placeholder="粘贴你的 anon public key" />
+
             <label class="field-label" for="videoApiBaseInput">视频下载后端地址（线上部署时必填）</label>
             <input id="videoApiBaseInput" class="text-input" type="text" placeholder="例如：https://video-api.your-domain.com" />
           </section>

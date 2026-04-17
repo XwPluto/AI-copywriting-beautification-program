@@ -2,11 +2,6 @@
 const CLOUD_DRAFTS_LOCAL_KEY = 'movieCopyBeautifierCloudDrafts';
 const CLOUD_AUTH_LOCAL_KEY = 'movieCopyBeautifierAuth';
 
-
-// V2：Supabase 配置占位
-const SUPABASE_URL = 'YOUR_SUPABASE_URL'; // 请替换为你的项目URL
-const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY'; // 请替换为你的anon key
-
 const SYSTEM_PROMPT = `角色设定：
 你是一位顶级的影视解说文案专家和语言风格美化师。你擅长将口语化、逻辑松散的电影剪辑博主笔记，优化为节奏感强、有感染力、逻辑清晰的专业解说文案。
 
@@ -32,7 +27,9 @@ const DEFAULT_SETTINGS = {
   cloudModel: '',
   videoApiBase: '',
   ollamaUrl: 'http://localhost:11434',
-  ollamaModel: ''
+  ollamaModel: '',
+  supabaseUrl: '',
+  supabaseAnonKey: ''
 };
 
 const $ = (id) => document.getElementById(id);
@@ -55,6 +52,8 @@ const el = {
   providerSelect: $('providerSelect'),
   apiKeyInput: $('apiKeyInput'),
   cloudModelInput: $('cloudModelInput'),
+  supabaseUrlInput: $('supabaseUrlInput'),
+  supabaseAnonKeyInput: $('supabaseAnonKeyInput'),
   videoApiBaseInput: $('videoApiBaseInput'),
   ollamaUrlInput: $('ollamaUrlInput'),
   ollamaModelSelect: $('ollamaModelSelect'),
@@ -106,18 +105,34 @@ const appState = {
 // =========================
 let supabaseClient = null;
 
+function getSupabaseRuntimeConfig() {
+  // 优先读取设置中的 Supabase 配置，实现纯静态站点也能启用真实云端
+  const s = loadSettings();
+  const url = (s.supabaseUrl || '').trim();
+  const key = (s.supabaseAnonKey || '').trim();
+  return { url, key };
+}
+
 function isSupabaseEnabled() {
-  return SUPABASE_URL && SUPABASE_ANON_KEY
-    && !SUPABASE_URL.includes('YOUR_SUPABASE_URL')
-    && !SUPABASE_ANON_KEY.includes('YOUR_SUPABASE_ANON_KEY')
-    && Boolean(window.supabase);
+  const { url, key } = getSupabaseRuntimeConfig();
+  return Boolean(url && key && window.supabase);
 }
 
 function getSupabaseClient() {
-  if (!isSupabaseEnabled()) return null;
-  if (!supabaseClient) {
-    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const { url, key } = getSupabaseRuntimeConfig();
+  if (!url || !key || !window.supabase) return null;
+
+  const shouldRecreate = !supabaseClient
+    || supabaseClient.__url !== url
+    || supabaseClient.__key !== key;
+
+  if (shouldRecreate) {
+    supabaseClient = window.supabase.createClient(url, key);
+    // 仅用于配置变更时重建客户端
+    supabaseClient.__url = url;
+    supabaseClient.__key = key;
   }
+
   return supabaseClient;
 }
 
@@ -129,7 +144,9 @@ function normalizeSettings(s = {}) {
     cloudModel: typeof s.cloudModel === 'string' ? s.cloudModel : '',
     videoApiBase: typeof s.videoApiBase === 'string' ? s.videoApiBase.trim() : '',
     ollamaUrl: typeof s.ollamaUrl === 'string' && s.ollamaUrl.trim() ? s.ollamaUrl.trim() : DEFAULT_SETTINGS.ollamaUrl,
-    ollamaModel: typeof s.ollamaModel === 'string' ? s.ollamaModel : ''
+    ollamaModel: typeof s.ollamaModel === 'string' ? s.ollamaModel : '',
+    supabaseUrl: typeof s.supabaseUrl === 'string' ? s.supabaseUrl.trim() : '',
+    supabaseAnonKey: typeof s.supabaseAnonKey === 'string' ? s.supabaseAnonKey.trim() : ''
   };
 }
 
@@ -153,6 +170,8 @@ function collectSettings() {
     provider: el.providerSelect.value,
     apiKey: el.apiKeyInput.value.trim(),
     cloudModel: el.cloudModelInput.value.trim(),
+    supabaseUrl: el.supabaseUrlInput?.value.trim() || '',
+    supabaseAnonKey: el.supabaseAnonKeyInput?.value.trim() || '',
     videoApiBase: el.videoApiBaseInput?.value.trim() || '',
     ollamaUrl: el.ollamaUrlInput.value.trim(),
     ollamaModel: el.ollamaModelSelect.value
@@ -164,6 +183,8 @@ function applySettings(s) {
   el.providerSelect.value = s.provider;
   el.apiKeyInput.value = s.apiKey;
   el.cloudModelInput.value = s.cloudModel;
+  if (el.supabaseUrlInput) el.supabaseUrlInput.value = s.supabaseUrl || '';
+  if (el.supabaseAnonKeyInput) el.supabaseAnonKeyInput.value = s.supabaseAnonKey || '';
   if (el.videoApiBaseInput) el.videoApiBaseInput.value = s.videoApiBase || '';
   el.ollamaUrlInput.value = s.ollamaUrl;
   el.ollamaModelSelect.dataset.pendingModel = s.ollamaModel || '';
@@ -621,7 +642,7 @@ async function saveCurrentDraftToCloud() {
       createdAt: new Date().toISOString()
     });
     saveLocalDrafts(list);
-    el.appStatus.textContent = '已保存到云空间（本地模拟）';
+    el.appStatus.textContent = '已保存（本地模拟：仅当前浏览器可见）';
     await refreshLibraryData();
     return;
   }
@@ -656,7 +677,7 @@ async function handleAuthSubmit() {
     appState.user = user;
     saveLocalAuth(user);
     updateAuthStatus();
-    if (el.authStatus) el.authStatus.textContent = appState.authMode === 'login' ? '登录成功（本地模拟）' : '注册成功（本地模拟）';
+    if (el.authStatus) el.authStatus.textContent = appState.authMode === 'login' ? '登录成功（本地模拟：仅当前浏览器可见）' : '注册成功（本地模拟：仅当前浏览器可见）';
     closeModal(el.authModal);
     await refreshLibraryData();
     return;
